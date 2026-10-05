@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>School — fish from simple rules</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sans: "Manrope", "Helvetica Neue", Arial, system-ui, sans-serif;
+    --display: var(--sans);
+  }
+  body[data-theme="lagoon"] {
+    --bg: #35a1c4; --ink: #0d3440; --ink-soft: rgba(13, 52, 64, 0.66);
+    --glass: rgba(240, 250, 253, 0.35); --glass-ink: #0b2a33; --glass-sub: rgba(11, 42, 51, 0.5);
+    --glass-line: rgba(8, 40, 50, 0.14); --glass-shadow: rgba(0, 30, 45, 0.16);
+  }
+  body[data-theme="shoal"] {
+    --bg: #2aa6c2; --ink: #f4fcfe; --ink-soft: rgba(244, 252, 254, 0.78);
+    --glass: rgba(242, 251, 253, 0.35); --glass-ink: #0a2e39; --glass-sub: rgba(10, 46, 57, 0.52);
+    --glass-line: rgba(8, 40, 50, 0.14); --glass-shadow: rgba(0, 30, 45, 0.18);
+  }
+  body[data-theme="ink"] {
+    --bg: #fbfbf8; --ink: #111; --ink-soft: rgba(17, 17, 17, 0.55);
+    --glass: rgba(255, 255, 255, 0.35); --glass-ink: #111; --glass-sub: rgba(17, 17, 17, 0.45);
+    --glass-line: rgba(0, 0, 0, 0.1); --glass-shadow: rgba(0, 0, 0, 0.1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: var(--bg); font-family: var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  canvas { position: fixed; inset: 0; display: block; touch-action: none; cursor: crosshair; }
+
+  .ui { transition: opacity .35s ease; }
+  body.clean .ui { opacity: 0; pointer-events: none; }
+
+  /* Frosted glass, after macOS: blurred backdrop, hairline outline,
+     a bright rim that catches light on the top edge, and a soft drop shadow */
+  .glass {
+    position: relative;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(15px) saturate(140%);
+    backdrop-filter: blur(15px) saturate(140%);
+    box-shadow:
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.45),
+      inset 0 0 12px rgba(255, 255, 255, 0.12),
+      0 0 0 0.5px rgba(255, 255, 255, 0.22);
+  }
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 0.5px;
+    background: linear-gradient(150deg, rgba(255,255,255,.6), rgba(255,255,255,.12) 30%, rgba(255,255,255,0) 50%, rgba(255,255,255,.08) 75%, rgba(255,255,255,.35));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .title {
+    position: fixed;
+    top: calc(24px + env(safe-area-inset-top, 0px));
+    left: 24px;
+    max-width: 19rem;
+    padding: 12px 18px 13px;
+    border-radius: 20px;
+    pointer-events: none;
+  }
+  .title h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 0 0 .2rem;
+    color: var(--glass-ink);
+  }
+  .title .author {
+    font-size: .74rem;
+    font-weight: 500;
+    line-height: 1.2;
+    margin: 0 0 .35rem;
+    color: var(--glass-ink);
+    opacity: .7;
+  }
+  .title p {
+    font-size: .84rem;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+    margin: 0;
+    color: var(--glass-ink);
+  }
+
+  .dock {
+    position: fixed;
+    left: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: calc(100vw - 48px);
+  }
+  .dock button {
+    font: 500 .8rem/1 var(--sans);
+    letter-spacing: -0.005em;
+    color: var(--glass-ink);
+    border: 0;
+    border-radius: 999px;
+    height: 34px;
+    padding: 0 15px;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background .2s, color .2s, transform .15s ease;
+  }
+  .dock button:hover { transform: scale(1.03); }
+  .dock button:active { transform: scale(.97); }
+  .dock button:focus-visible { outline: 2px solid var(--glass-ink); outline-offset: 3px; }
+  /* selected: a solid white pill, like the active tab on apple.com */
+  .dock button[aria-pressed="true"] { background: #fff; color: #111; }
+  body[data-theme="ink"] .dock button[aria-pressed="true"] { background: #111; color: #fff; }
+  .dock button.recording { background: #fff; color: #d70015; }
+
+  .hint {
+    position: fixed;
+    right: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    max-width: 17.5rem;
+    padding: 10px 15px;
+    border-radius: 18px;
+    font-size: .74rem;
+    line-height: 1.2;
+    color: var(--glass-ink);
+    pointer-events: none;
+  }
+
+  .rules {
+    position: fixed;
+    top: calc(24px + env(safe-area-inset-top, 0px));
+    right: 24px;
+    width: min(21rem, calc(100vw - 48px));
+    max-height: calc(100vh - 130px);
+    overflow-y: auto;
+    padding: 16px 20px 18px;
+    border-radius: 28px;
+    color: var(--glass-ink);
+  }
+  .rules[hidden] { display: none; }
+  .rules h2 {
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--glass-ink);
+    margin: 0 0 .6rem;
+  }
+  .rules ol { margin: 0; padding-left: 1.15rem; }
+  .rules li { font-size: .84rem; line-height: 1.2; margin-bottom: .5rem; letter-spacing: -0.005em; }
+  .rules li::marker { color: var(--glass-ink); }
+  .rules li b { font-weight: 600; }
+  .rules .foot {
+    font-size: .74rem; line-height: 1.2; color: var(--glass-ink);
+    margin: .8rem 0 0; padding-top: .8rem;
+    border-top: 0.5px solid var(--glass-line);
+  }
+
+  @media (max-width: 640px) {
+    .title { left: 20px; }
+    .hint { display: none; }
+    .dock { left: 14px; gap: 6px; }
+    .dock button { height: 32px; padding: 0 12px; font-size: .76rem; }
+    .rules { right: 14px; top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+  }
+  @media (prefers-reduced-motion: reduce) { .dock button { transition: none; } }
+</style>
+</head>
+<body data-theme="lagoon">
+<canvas id="sea" aria-label="An animated school of fish. Click to startle them."></canvas>
+
+<header class="title glass ui">
+  <p class="author">Shirley (Xinyi) Du</p>
+  <h1>School</h1>
+  <p>A few hundred fish, each following a handful of rules. Nobody leads the group.</p>
+</header>
+
+<nav class="dock ui" aria-label="Controls">
+  <button id="btnShark" class="glass" aria-pressed="false"><span class="label">Shark</span></button>
+  <button id="btnMother" class="glass" aria-pressed="false"><span class="label">Mother whale</span></button>
+  <button id="btnStyle" class="glass"><span class="label">Lagoon</span></button>
+  <button id="btnRules" class="glass" aria-pressed="false"><span class="label">Rules</span></button>
+  <button id="btnRec" class="glass"><span class="label">Record teaser</span></button>
+</nav>
+
+<p class="hint glass ui">Click the water to startle the school. Drag the shark or the whale to steer them. Press H to hide the controls.</p>
+
+<aside class="rules glass ui" id="rules" hidden aria-label="The rules">
+  <h2>What each fish knows</h2>
+  <ol>
+    <li><b>Keep your space.</b> If a neighbor gets too close, move away from it.</li>
+    <li><b>Match your own kind.</b> Turn toward the direction the fish of your species around you are swimming.</li>
+    <li><b>Stay with your own kind.</b> Drift toward the middle of the fish of your species you can see.</li>
+    <li><b>Flee the shark.</b> If the shark is near, swim away from it and become afraid.</li>
+    <li><b>Fear is contagious.</b> If a neighbor is afraid, you become a little afraid too. Afraid fish swim faster, keep more distance and stop caring about the group.</li>
+    <li><b>Shelter by the whale.</b> If the mother whale is near, swim alongside her and match her pace. Her calm spreads to neighbors, and fear fades faster around her.</li>
+  </ol>
+  <p class="foot">Four species share the water, so the school sorts itself into separate streams that still panic together. A click is a sudden splash: fish nearby are pushed away and get a jolt of fear, which then travels through the school by rule 5. Each fish only sees about two body lengths around itself.</p>
+</aside>
+
+<script>
+(() => {
+'use strict';
+
+/* ------------------------------------------------------------
+   Setup
+------------------------------------------------------------ */
+const canvas = document.getElementById('sea');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+const P = {
+  view: 64,          // how far a fish can see (px)
+  speed: 1.9,        // cruising speed
+  force: 0.055,      // how sharply a fish can turn
+  wSep: 1.7, wAli: 1.1, wCoh: 0.8, wander: 0.035,
+  fleeR: 180, wFlee: 3.6, panicBoost: 1.4,
+  wFollow: 1.0,
+  fearSpread: 0.88, fearDecay: 0.982,
+  trustSpread: 0.82, trustDecay: 0.99,
+  burstR: 150,
+};
+
+const rand = (a = 1, b) => (b === undefined ? Math.random() * a : a + Math.random() * (b - a));
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const mix = (a, b, t) => a + (b - a) * t;
+function hash1(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+function noise1(t) { const i = Math.floor(t), f = t - i, u = f * f * (3 - 2 * f); return hash1(i) * (1 - u) + hash1(i + 1) * u; }
+function fbm(x) { let v = 0, a = 0.5, f = 1; for (let o = 0; o < 4; o++) { v += a * noise1(x * f + o * 17.3); f *= 2; a *= 0.5; } return v / 0.9375; }
+function lerpAngle(a, b, t) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
+/* ------------------------------------------------------------
+   Species: body shapes taken from the silhouette references
+   depth = body height / length, tail = half-span of the tail / length
+------------------------------------------------------------ */
+const SPECIES = [
+  { key: 'mackerel', share: 0.34, len: [20, 46], depth: 0.2,  tail: 0.13, tailLen: 0.13, fork: 0.35, dorsal: 0.07, dorsalX: 0.1, belly: 0.95, finlets: true },
+  { key: 'sprat',    share: 0.26, len: [13, 30], depth: 0.17, tail: 0.11, tailLen: 0.12, fork: 0.3,  dorsal: 0.05, dorsalX: 0.02, belly: 0.9, finlets: false },
+  { key: 'jack',     share: 0.24, len: [22, 48], depth: 0.3,  tail: 0.17, tailLen: 0.15, fork: 0.3,  dorsal: 0.09, dorsalX: 0.06, belly: 1.05, finlets: false },
+  { key: 'bream',    share: 0.16, len: [18, 38], depth: 0.38, tail: 0.15, tailLen: 0.13, fork: 0.45, dorsal: 0.08, dorsalX: 0.12, belly: 1.0, finlets: false },
+];
+
+/* ------------------------------------------------------------
+   Illustration styles (from the reference images)
+   colors per species: [near, far]
+------------------------------------------------------------ */
+const THEMES = {
+  lagoon: {
+    name: 'Lagoon',
+    bgTop: '#3aa8ca', bgBot: '#2f98bb', glow: 'rgba(170,232,245,0.35)',
+    band: 'rgba(118,208,230,0.45)', bubble: '#86d6ea',
+    colors: {
+      mackerel: ['#1d5866', '#2f7f98'], sprat: ['#2b6e82', '#4796b0'],
+      jack: ['#14404e', '#286b84'], bream: ['#245c5e', '#3c8a93'],
+    },
+    alpha: 1, fearTo: hexRGB('#d4f2f8'),
+    whale: { body: '#2e5266', sheen: 'rgba(120,160,180,0.35)', throat: '#cddde4', groove: 'rgba(110,140,155,0.7)', dark: '#1a2f3b', nearFin: '#2a4a5c', farFin: '#9db6c1', edge: '#c3d5dc' },
+    shark: { top: '#46687a', fin: '#3d5d6e', belly: '#e4eff2', detail: '#1a2d37' },
+    ring: 'rgba(205,240,248,0.85)', detail: false,
+  },
+  shoal: {
+    name: 'Shoal',
+    bgTop: '#3cbad0', bgBot: '#15869f', glow: 'rgba(255,255,255,0.16)',
+    band: 'rgba(255,255,255,0.07)', bubble: 'rgba(225,246,250,0.75)',
+    colors: {
+      mackerel: ['#dbeff3', '#8fd0df'], sprat: ['#f1fafc', '#a9dde8'],
+      jack: ['#3e7c8c', '#5ea7ba'], bream: ['#b4dde7', '#78bfd1'],
+    },
+    alpha: 0.92, fearTo: hexRGB('#ffffff'),
+    whale: { body: '#28566b', sheen: 'rgba(140,190,210,0.3)', throat: '#d8ecf1', groove: 'rgba(110,150,165,0.7)', dark: '#163444', nearFin: '#244c60', farFin: '#a6cfdb', edge: '#cfe6ed' },
+    shark: { top: '#3f6c80', fin: '#375f72', belly: '#eef7f9', detail: '#16303c' },
+    ring: 'rgba(255,255,255,0.8)', detail: true,
+  },
+  ink: {
+    name: 'Ink',
+    bgTop: '#fbfbf8', bgBot: '#f4f3ef', glow: null,
+    band: null, bubble: null,
+    colors: {
+      mackerel: ['#161616', '#3a3a3a'], sprat: ['#2c2c2c', '#565656'],
+      jack: ['#161616', '#3a3a3a'], bream: ['#9a9a9c', '#b8b8ba'],
+    },
+    alpha: 1, fearTo: hexRGB('#d6d6d6'),
+    whale: { body: '#bdbdba', sheen: 'rgba(255,255,255,0.25)', throat: '#e6e6e2', groove: 'rgba(120,120,120,0.5)', dark: '#8a8a87', nearFin: '#b2b2af', farFin: '#dcdcd9', edge: '#e2e2de' },
+    shark: { top: '#1a1a1a', fin: '#111111', belly: '#4a4a4a', detail: '#000000' },
+    ring: 'rgba(22,22,22,0.45)', detail: false,
+  },
+};
+const THEME_ORDER = ['lagoon', 'shoal', 'ink'];
+let theme = THEMES.lagoon;
+let speciesRGB = {};
+function cacheColors() {
+  speciesRGB = {};
+  for (const k in theme.colors) speciesRGB[k] = theme.colors[k].map(hexRGB);
+}
+
+/* ------------------------------------------------------------
+   Fish
+------------------------------------------------------------ */
+class Fish {
+  constructor(x, y, heading, sp) {
+    this.sp = sp;
+    this.x = x; this.y = y;
+    const a = heading + rand(-0.4, 0.4);
+    this.vx = Math.cos(a) * P.speed; this.vy = Math.sin(a) * P.speed;
+    this.heading = a;
+    this.fear = 0; this.nextFear = 0;
+    this.trust = 0; this.nextTrust = 0;
+    this.z = Math.pow(Math.random(), 1.4);       // 0 = far away, 1 = close to the viewer
+    this.len = mix(sp.len[0], sp.len[1], this.z);
+    this.size = this.len / 3;                    // used for personal space
+    this.phase = rand(Math.PI * 2);
+    this.tone = rand(-8, 8);
+    this.seed = rand(1000);
+    this.slotA = rand(-0.4, 0.3);                // where it likes to swim beside the whale
+    this.slotS = rand(-1, 1);
+    this.cell = 0;
+  }
+}
+
+let fish = [];
+function populate() {
+  const count = Math.round(clamp((W * H) / 4500, 150, 400));
+  fish = [];
+  for (const sp of SPECIES) {
+    const n = Math.round(count * sp.share);
+    const cx = rand(W * 0.2, W * 0.8), cy = rand(H * 0.25, H * 0.75), h = rand(Math.PI * 2);
+    for (let i = 0; i < n; i++) fish.push(new Fish(cx + rand(-120, 120), cy + rand(-70, 70), h, sp));
+  }
+  fish.sort((a, b) => a.z - b.z);   // draw far fish first
+}
+
+/* Spatial grid so each fish only checks nearby fish */
+let cols = 0, rows = 0, grid = [];
+function buildGrid() {
+  const cs = P.view;
+  const c = Math.ceil(W / cs) + 1, r = Math.ceil(H / cs) + 1;
+  if (c !== cols || r !== rows) { cols = c; rows = r; grid = Array.from({ length: cols * rows }, () => []); }
+  else for (let i = 0; i < grid.length; i++) grid[i].length = 0;
+  for (const f of fish) {
+    const gx = clamp((f.x / cs) | 0, 0, cols - 1), gy = clamp((f.y / cs) | 0, 0, rows - 1);
+    f.cell = gx + gy * cols;
+    grid[f.cell].push(f);
+  }
+}
+
+/* Reynolds-style steering: desired direction at max speed, minus current velocity */
+function steer(f, dx, dy, maxS, maxF) {
+  const d = Math.hypot(dx, dy);
+  if (d === 0) return [0, 0];
+  let sx = (dx / d) * maxS - f.vx, sy = (dy / d) * maxS - f.vy;
+  const m = Math.hypot(sx, sy);
+  if (m > maxF) { sx = (sx / m) * maxF; sy = (sy / m) * maxF; }
+  return [sx, sy];
+}
+
+
+/* ------------------------------------------------------------
+   Shark and mother whale
+------------------------------------------------------------ */
+function makeAgent(kind) {
+  return {
+    kind, active: false, leaving: false, dragging: false,
+    x: 0, y: 0, vx: 0, vy: 0, heading: 0, dir: 1, hidden: false, wait: 0, phase: 0, t: rand(100),
+    len: kind === 'shark' ? 200 : 600,
+    cruise: kind === 'shark' ? 3.0 : 0.8,
+    turnForce: kind === 'shark' ? 0.07 : 0.012,
+  };
+}
+const shark = makeAgent('shark');
+const whale = makeAgent('whale');
+function whaleLen() { return clamp(Math.min(W * 0.6, H * 1.1), 380, 900); }
+
+function toggleAgent(a) {
+  if (a.active && !a.leaving) { a.leaving = true; a.dragging = false; }
+  else if (a.leaving) a.leaving = false;
+  else {
+    if (a.kind === 'whale') a.len = whaleLen();
+    else a.len = whaleLen() * 0.34;   // a great white is about a third of a humpback
+    const fromLeft = Math.random() < 0.5;
+    a.active = true; a.leaving = false;
+    a.x = fromLeft ? -a.len * 0.55 : W + a.len * 0.55;
+    a.y = rand(H * 0.35, H * 0.65);
+    a.vx = fromLeft ? a.cruise : -a.cruise; a.vy = 0;
+    a.heading = Math.atan2(a.vy, a.vx);
+    a.dir = fromLeft ? 1 : -1; a.hidden = false;
+  }
+  syncButtons();
+}
+
+function updateAgent(a) {
+  if (!a.active) return;
+  if (a.kind === 'whale') return updateWhale(a);
+  updateShark(a);
+}
+
+/* The shark never turns around on screen. It makes fast, mostly straight
+   passes, bending toward fish ahead of it, swims off the edge, waits out of
+   sight for a moment and comes back in from either side. */
+function sharkEnter(a) {
+  const fromLeft = Math.random() < 0.5;
+  a.dir = fromLeft ? 1 : -1;
+  a.x = fromLeft ? -a.len * 0.6 : W + a.len * 0.6;
+  a.y = rand(H * 0.2, H * 0.8);
+  a.vx = a.dir * a.cruise; a.vy = 0;
+  a.heading = fromLeft ? 0 : Math.PI;
+  a.hidden = false;
+}
+function updateShark(a) {
+  if (a.hidden) {
+    if (a.leaving) { a.active = false; a.leaving = false; a.hidden = false; syncButtons(); return; }
+    if (--a.wait <= 0) sharkEnter(a);
+    return;
+  }
+  const base = a.dir > 0 ? 0 : Math.PI;
+  if (a.dragging) {
+    a.vx += (pointer.x - grab.x - a.x) * 0.03; a.vy += (pointer.y - grab.y - a.y) * 0.03;
+    a.vx *= 0.85; a.vy *= 0.85;
+  } else {
+    a.t += 0.01;
+    let speed = a.cruise;
+    let tilt = (noise1(a.t) - 0.5) * 0.5;                         // a gentle weave
+    if (!a.leaving) {
+      // hunt: bend toward the nearest fish that is ahead of it
+      let best = null, bd = 380 * 380;
+      for (const f of fish) {
+        const ex = f.x - a.x, ey = f.y - a.y;
+        if (ex * a.dir < 20) continue;
+        const d = ex * ex + ey * ey;
+        if (d < bd) { bd = d; best = f; }
+      }
+      if (best) {
+        const want = Math.atan2(best.y - a.y, (best.x - a.x) * a.dir);
+        tilt = tilt * 0.3 + clamp(want, -0.6, 0.6);
+        if (bd < 200 * 200) speed *= 1.45;                         // a burst when close
+      }
+    }
+    // stay roughly in the water column
+    if (a.y < H * 0.12) tilt += 0.4; else if (a.y > H * 0.88) tilt -= 0.4;
+    const ang = base + clamp(tilt, -0.7, 0.7) * a.dir;
+    let sx = Math.cos(ang) * speed - a.vx, sy = Math.sin(ang) * speed - a.vy;
+    const sm = Math.hypot(sx, sy), mf = a.turnForce;
+    if (sm > mf) { sx = (sx / sm) * mf; sy = (sy / sm) * mf; }
+    a.vx += sx; a.vy += sy;
+  }
+  a.x += a.vx; a.y += a.vy;
+  const sp = Math.hypot(a.vx, a.vy);
+  a.phase += 0.08 + sp * 0.06;
+  let rel = Math.atan2(a.vy, a.vx) - base;
+  while (rel > Math.PI) rel -= Math.PI * 2;
+  while (rel < -Math.PI) rel += Math.PI * 2;
+  if (Math.abs(rel) > Math.PI / 2) rel = 0;
+  a.heading = lerpAngle(a.heading, base + clamp(rel, -0.7, 0.7), 0.12);
+  // off the edge: disappear for a moment, then return
+  const out = a.len * 0.65;
+  if (!a.dragging && ((a.dir > 0 && a.x > W + out) || (a.dir < 0 && a.x < -out))) {
+    a.hidden = true;
+    a.wait = Math.round(rand(60, 180));   // 1 to 3 seconds out of sight
+  }
+}
+
+/* The whale never turns around. She cruises across in one direction,
+   rising and sinking in long curves, and comes back in from the other side. */
+function updateWhale(a) {
+  const base = a.dir > 0 ? 0 : Math.PI;
+  if (a.dragging) {
+    a.vx += (pointer.x - grab.x - a.x) * 0.008; a.vy += (pointer.y - grab.y - a.y) * 0.008;
+    a.vx *= 0.94; a.vy *= 0.94;
+  } else {
+    a.t += 0.004;
+    const s = a.cruise;
+    let tilt = (noise1(a.t) - 0.5) * 0.7;                              // gentle rise and dive
+    tilt += clamp((H * 0.5 - a.y) / (H * 0.5), -1, 1) * 0.35 * a.dir;  // drift back toward mid-water
+    const ang = base + tilt * a.dir;
+    let dx = Math.cos(ang) * s * (a.leaving ? 1.4 : 1), dy = Math.sin(ang) * s;
+    let sx = dx - a.vx, sy = dy - a.vy;
+    const sm = Math.hypot(sx, sy), mf = a.turnForce;
+    if (sm > mf) { sx = (sx / sm) * mf; sy = (sy / sm) * mf; }
+    a.vx += sx; a.vy += sy;
+  }
+  a.x += a.vx; a.y += a.vy;
+  const out = a.len * 0.6 + 40;
+  if (a.leaving && (a.x < -out || a.x > W + out)) { a.active = false; a.leaving = false; syncButtons(); return; }
+  if (!a.dragging && !a.leaving) {
+    if (a.dir > 0 && a.x > W + out) { a.x = -out; a.y = rand(H * 0.3, H * 0.7); }
+    if (a.dir < 0 && a.x < -out) { a.x = W + out; a.y = rand(H * 0.3, H * 0.7); }
+  }
+  const sp = Math.hypot(a.vx, a.vy);
+  a.phase += 0.012 + sp * 0.012;
+  // she always faces her travel direction; a drag can only tilt her
+  let rel = Math.atan2(a.vy, a.vx) - base;
+  while (rel > Math.PI) rel -= Math.PI * 2;
+  while (rel < -Math.PI) rel += Math.PI * 2;
+  if (Math.abs(rel) > Math.PI / 2) rel = 0;          // dragged backwards: stay level
+  a.heading = lerpAngle(a.heading, base + clamp(rel, -0.55, 0.55), 0.04);
+}
+
+/* ------------------------------------------------------------
+   The rules, applied to every fish every frame
+------------------------------------------------------------ */
+let T = 0;
+function updateFish() {
+  const view2 = P.view * P.view;
+  const whx = Math.cos(whale.heading), why = Math.sin(whale.heading);
+  const followR = whale.len * 0.75;
+
+  for (const f of fish) {
+    let n = 0, aX = 0, aY = 0, cX = 0, cY = 0, sX = 0, sY = 0, nFear = 0, nTrust = 0;
+    const gx = f.cell % cols, gy = (f.cell / cols) | 0;
+    const fs = Math.hypot(f.vx, f.vy) || 1;
+
+    for (let j = -1; j <= 1; j++) {
+      const yy = gy + j; if (yy < 0 || yy >= rows) continue;
+      for (let i = -1; i <= 1; i++) {
+        const xx = gx + i; if (xx < 0 || xx >= cols) continue;
+        const cell = grid[xx + yy * cols];
+        for (let k = 0; k < cell.length; k++) {
+          const o = cell[k];
+          if (o === f) continue;
+          const dx = o.x - f.x, dy = o.y - f.y, d2 = dx * dx + dy * dy;
+          if (d2 > view2) continue;
+          // Rule 1: keep your space from everyone (bigger fish need more room)
+          const room = 6 + (f.size + o.size) * 1.1;
+          if (d2 < room * room) { const inv = 1 / (d2 + 0.5); sX -= dx * inv; sY -= dy * inv; }
+          // fish can't see straight behind themselves
+          if ((dx * f.vx + dy * f.vy) < -0.55 * Math.sqrt(d2) * fs) continue;
+          // feelings pass between any species
+          if (o.fear > nFear) nFear = o.fear;
+          if (o.trust > nTrust) nTrust = o.trust;
+          // Rules 2 and 3 only count your own kind
+          if (o.sp !== f.sp) continue;
+          n++;
+          aX += o.vx; aY += o.vy; cX += o.x; cY += o.y;
+        }
+      }
+    }
+
+    let fear = f.fear * P.fearDecay;
+    let trust = f.trust * P.trustDecay;
+    // Rule 5: fear is contagious (rises gradually, so it travels as a visible wave)
+    const fearTarget = nFear * P.fearSpread;
+    if (fearTarget > fear) fear += (fearTarget - fear) * 0.3;
+    const trustTarget = nTrust * P.trustSpread;
+    if (trustTarget > trust) trust += (trustTarget - trust) * 0.15;
+
+    const maxS = P.speed * (0.88 + 0.24 * f.z) * (1 + P.panicBoost * f.fear);
+    const maxF = P.force * (1 + 1.6 * f.fear);
+    let fx = 0, fy = 0, s;
+
+    if (n > 0) {
+      s = steer(f, aX / n, aY / n, maxS, maxF); fx += s[0] * P.wAli; fy += s[1] * P.wAli;
+      const wc = P.wCoh * (1 - 0.8 * f.fear);
+      s = steer(f, cX / n - f.x, cY / n - f.y, maxS, maxF); fx += s[0] * wc; fy += s[1] * wc;
+    }
+    if (sX || sY) {
+      const ws = P.wSep * (1 + f.fear);
+      s = steer(f, sX, sY, maxS, maxF); fx += s[0] * ws; fy += s[1] * ws;
+    }
+
+    // Rule 4: flee the shark
+    if (shark.active && !shark.hidden) {
+      const dx = f.x - shark.x, dy = f.y - shark.y, d = Math.hypot(dx, dy);
+      const R = Math.max(P.fleeR, shark.len * 1.1);
+      if (d < R) {
+        const k = 1 - d / R;
+        fear = Math.max(fear, Math.min(1, k * 1.4));
+        s = steer(f, dx, dy, maxS, maxF * 1.5);
+        fx += s[0] * P.wFlee * k; fy += s[1] * P.wFlee * k;
+      }
+    }
+
+    // Rule 6: shelter alongside the whale
+    if (whale.active) {
+      const L = whale.len, hh = L * 0.2 * whale.dir;
+      const tx = whale.x + whx * f.slotA * L - why * f.slotS * hh * 0.8;
+      const ty = whale.y + why * f.slotA * L + whx * f.slotS * hh * 0.8;
+      const dx = tx - f.x, dy = ty - f.y, d = Math.hypot(dx, dy);
+      const dw = Math.hypot(f.x - whale.x, f.y - whale.y);
+      if (dw < followR) {
+        const k = 1 - dw / followR;
+        trust = Math.max(trust, k);
+        const w = P.wFollow * (0.25 + 0.75 * k) * (1 - 0.7 * f.fear);
+        s = d > 60 ? steer(f, dx, dy, maxS, maxF)              // swim to your spot beside her
+                   : steer(f, whale.vx, whale.vy, maxS, maxF);  // then keep her pace
+        fx += s[0] * w; fy += s[1] * w;
+      }
+    }
+    fear *= 1 - 0.08 * trust;   // calm makes fear fade faster
+    if (fear < 0.02) fear = 0;
+    if (trust < 0.02) trust = 0;
+    f.nextFear = fear; f.nextTrust = trust;
+
+    // a little individual wandering so no two fish are identical
+    const w = (noise1(f.seed + T * 0.7) - 0.5) * P.wander;
+    fx += -f.vy * w; fy += f.vx * w;
+
+    // soft walls
+    const m = 60, push = 0.09;
+    if (f.x < m) fx += ((m - f.x) / m) * push;
+    if (f.x > W - m) fx -= ((f.x - (W - m)) / m) * push;
+    if (f.y < m) fy += ((m - f.y) / m) * push;
+    if (f.y > H - m) fy -= ((f.y - (H - m)) / m) * push;
+
+    f.vx += fx; f.vy += fy;
+    let sp = Math.hypot(f.vx, f.vy);
+    if (sp > maxS) { const r = Math.max(maxS, sp * 0.94) / sp; f.vx *= r; f.vy *= r; sp *= r; }
+    const minS = P.speed * 0.55;
+    if (sp < minS && sp > 0) { f.vx = (f.vx / sp) * minS; f.vy = (f.vy / sp) * minS; sp = minS; }
+    f.x += f.vx; f.y += f.vy;
+    f.heading = lerpAngle(f.heading, Math.atan2(f.vy, f.vx), 0.25);
+    f.phase += 0.14 + sp * 0.12;
+  }
+  for (const f of fish) { f.fear = f.nextFear; f.trust = f.nextTrust; }
+}
+
+/* ------------------------------------------------------------
+   Click: a splash
+------------------------------------------------------------ */
+function splash(x, y) {
+  for (let i = 0; i < 16; i++) addBubble(x + rand(-16, 16), y + rand(-12, 12), rand(1, 3.2), true);
+  for (const f of fish) {
+    const dx = f.x - x, dy = f.y - y, d = Math.hypot(dx, dy);
+    if (d < P.burstR) {
+      const k = 1 - d / P.burstR, n = d || 1;
+      f.vx += (dx / n) * k * 5.5; f.vy += (dy / n) * k * 5.5;
+      f.fear = Math.max(f.fear, k * 0.85);
+    }
+  }
+}
+
+/* ------------------------------------------------------------
+   Water: flat color, swaying light bands (fBm), bubbles
+------------------------------------------------------------ */
+const BANDS = [
+  { a: [0.42, -0.08], b: [1.08, 0.34], w: 46, seed: 3.1 },
+  { a: [0.72, -0.08], b: [1.08, 0.14], w: 22, seed: 8.7 },
+  { a: [-0.08, 0.52], b: [0.7, 1.08], w: 40, seed: 14.2 },
+];
+function drawBands(t) {
+  if (!theme.band) return;
+  ctx.fillStyle = theme.band;
+  const N = 36;
+  for (const b of BANDS) {
+    const ax = b.a[0] * W, ay = b.a[1] * H, bx = b.b[0] * W, by = b.b[1] * H;
+    const len = Math.hypot(bx - ax, by - ay), nx = -(by - ay) / len, ny = (bx - ax) / len;
+    const top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const s = i / N;
+      const sway = (fbm(s * 1.6 + t * 0.05 + b.seed) - 0.5) * 70;
+      const width = b.w * (0.45 + 0.9 * fbm(s * 2.4 - t * 0.04 + b.seed * 2)) * Math.pow(Math.sin(Math.PI * s), 0.35);
+      const cx = ax + (bx - ax) * s + nx * sway, cy = ay + (by - ay) * s + ny * sway;
+      top.push([cx + nx * width / 2, cy + ny * width / 2]);
+      bot.push([cx - nx * width / 2, cy - ny * width / 2]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(top[0][0], top[0][1]);
+    for (let i = 1; i <= N; i++) ctx.lineTo(top[i][0], top[i][1]);
+    for (let i = N; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+const bubbles = [];
+function addBubble(x, y, r, fast) {
+  bubbles.push({
+    x, y, r,
+    vy: -(0.25 + r * 0.1) * (fast ? 1.6 : 1),
+    seed: rand(100),
+    life: 1,
+    fade: 1 / rand(70, 150),          // fades out over roughly 1 to 2.5 seconds
+  });
+}
+/* Calm water has no bubbles. They come from clicks and from the shark,
+   rise a little, and slowly fade away. */
+function updateBubbles() {
+  if (shark.active && !shark.hidden && Math.random() < 0.3) {
+    const L = shark.len, hx = Math.cos(shark.heading), hy = Math.sin(shark.heading);
+    const along = rand(-0.35, 0.35) * L, side = rand(-0.06, 0.06) * L;
+    addBubble(shark.x + hx * along - hy * side, shark.y + hy * along + hx * side, rand(0.8, 2.4));
+  }
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    b.y += b.vy; b.vy *= 0.99;
+    b.x += Math.sin(T * 1.6 + b.seed) * 0.2;
+    b.life -= b.fade;
+    if (b.life <= 0) bubbles.splice(i, 1);
+  }
+}
+function drawBubbles() {
+  ctx.fillStyle = theme.bubble || theme.ring;
+  for (const b of bubbles) {
+    ctx.globalAlpha = Math.min(1, b.life * 1.4);
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawWater(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, theme.bgTop);
+  g.addColorStop(1, theme.bgBot);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  if (theme.glow) {
+    const r = Math.max(W, H) * 0.7;
+    const gl = ctx.createRadialGradient(W * 0.45, -H * 0.15, 0, W * 0.45, -H * 0.15, r);
+    gl.addColorStop(0, theme.glow);
+    gl.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(0, 0, W, H);
+  }
+  drawBands(t);
+}
+
+/* ------------------------------------------------------------
+   Drawing fish (side-view silhouettes, pointing +x)
+------------------------------------------------------------ */
+function fishBody(sp, L, wig) {
+  const h = sp.depth * L, b = sp.belly;
+  const pw = 0.022 * L;                         // tail stem half-thickness
+  const ts = sp.tail * L, tl = sp.tailLen * L;  // tail half-span and length
+  const px = -0.36 * L;                         // where the tail begins
+  ctx.beginPath();
+  ctx.moveTo(0.5 * L, 0.06 * h);
+  ctx.bezierCurveTo(0.45 * L, -0.42 * h, 0.25 * L, -0.5 * h, 0.02 * L, -0.5 * h);
+  ctx.bezierCurveTo(-0.14 * L, -0.5 * h, -0.26 * L, -0.2 * h, px, -pw + wig * 0.5);
+  // crescent tail: thin lobes swept back
+  ctx.quadraticCurveTo(px - tl * 0.35, -pw - ts * 0.25 + wig * 0.75, px - tl, -ts + wig);
+  ctx.quadraticCurveTo(px - tl * 0.55, -ts * 0.35 + wig, px - tl * sp.fork, wig);
+  ctx.quadraticCurveTo(px - tl * 0.55, ts * 0.35 + wig, px - tl, ts + wig);
+  ctx.quadraticCurveTo(px - tl * 0.35, pw + ts * 0.25 + wig * 0.75, px, pw + wig * 0.5);
+  ctx.bezierCurveTo(-0.26 * L, 0.2 * h * b, -0.14 * L, 0.5 * h * b, 0.02 * L, 0.5 * h * b);
+  ctx.bezierCurveTo(0.25 * L, 0.5 * h * b, 0.45 * L, 0.32 * h, 0.5 * L, 0.06 * h);
+  ctx.closePath();
+}
+function fishFins(sp, L, flap) {
+  const h = sp.depth * L, dh = sp.dorsal * L, dx = sp.dorsalX * L;
+  ctx.beginPath();
+  // dorsal, swept back
+  ctx.moveTo(dx + 0.04 * L, -0.46 * h);
+  ctx.quadraticCurveTo(dx - 0.02 * L, -0.5 * h - dh * 0.8, dx - 0.07 * L, -0.5 * h - dh);
+  ctx.quadraticCurveTo(dx - 0.07 * L, -0.5 * h - dh * 0.3, dx - 0.12 * L, -0.44 * h);
+  ctx.closePath();
+  // pectoral
+  ctx.moveTo(0.24 * L, 0.12 * h);
+  ctx.quadraticCurveTo(0.16 * L, 0.2 * h + (0.05 + flap) * L, 0.1 * L, 0.22 * h + (0.06 + flap) * L);
+  ctx.quadraticCurveTo(0.15 * L, 0.2 * h, 0.19 * L, 0.1 * h);
+  ctx.closePath();
+  // anal
+  ctx.moveTo(-0.1 * L, 0.42 * h);
+  ctx.quadraticCurveTo(-0.15 * L, 0.5 * h + 0.05 * L, -0.2 * L, 0.48 * h + 0.045 * L);
+  ctx.quadraticCurveTo(-0.18 * L, 0.42 * h, -0.2 * L, 0.32 * h);
+  ctx.closePath();
+  if (sp.finlets) {   // the little row of spikes near a mackerel's tail
+    for (let i = 0; i < 3; i++) {
+      const x = (-0.2 - i * 0.045) * L, yt = -(0.4 - i * 0.08) * h, yb = (0.4 - i * 0.08) * h;
+      ctx.moveTo(x, yt); ctx.lineTo(x - 0.03 * L, yt - 0.025 * L); ctx.lineTo(x - 0.025 * L, yt + 0.01 * L); ctx.closePath();
+      ctx.moveTo(x, yb); ctx.lineTo(x - 0.03 * L, yb + 0.025 * L); ctx.lineTo(x - 0.025 * L, yb - 0.01 * L); ctx.closePath();
+    }
+  }
+}
+
+function fishColor(f) {
+  const th = theme, pair = speciesRGB[f.sp.key];
+  const far = 1 - f.z;
+  let r = mix(pair[0][0], pair[1][0], far) + f.tone;
+  let g = mix(pair[0][1], pair[1][1], far) + f.tone;
+  let b = mix(pair[0][2], pair[1][2], far) + f.tone;
+  return `rgba(${r | 0},${g | 0},${b | 0},${th.alpha})`;
+}
+
+function drawFish(f) {
+  const sp = f.sp, L = f.len, h = sp.depth * L;
+  const spd = Math.hypot(f.vx, f.vy);
+  const wig = Math.sin(f.phase) * (0.35 + spd * 0.12) * L * 0.045;
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  ctx.rotate(f.heading);
+  ctx.fillStyle = fishColor(f);
+  fishBody(sp, L, wig); ctx.fill();
+  fishFins(sp, L, Math.sin(f.phase * 0.5) * 0.015); ctx.fill();
+  if (theme.detail && L > 24) {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.ellipse(0.06 * L, 0.12 * h, 0.13 * L, 0.16 * h, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(20,70,85,0.8)';
+    ctx.beginPath(); ctx.arc(0.38 * L, -0.08 * h, Math.max(0.8, L * 0.018), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ------------------------------------------------------------
+   Mother whale: a humpback at real scale next to the school.
+   Shape follows the humpback references: long knobbly head,
+   pale grooved throat, small dorsal fin, very long flippers,
+   narrow tail stock and broad scalloped flukes.
+   All coordinates are fractions of the whale's length, head at +x.
+------------------------------------------------------------ */
+function whaleBody(L, wig) {
+  const X = v => v * L, Y = v => v * L;
+  ctx.beginPath();
+  ctx.moveTo(X(0.5), Y(0.004));
+  // top of the head and back
+  ctx.bezierCurveTo(X(0.48), Y(-0.03), X(0.4), Y(-0.075), X(0.28), Y(-0.105));
+  ctx.bezierCurveTo(X(0.14), Y(-0.135), X(-0.02), Y(-0.13), X(-0.14), Y(-0.1));
+  ctx.bezierCurveTo(X(-0.24), Y(-0.07), X(-0.3), Y(-0.04) + wig * 0.3, X(-0.37), Y(-0.022) + wig * 0.6);
+  // flukes: upper lobe, scalloped trailing edge, notch, lower lobe
+  ctx.quadraticCurveTo(X(-0.41), Y(-0.04) + wig * 0.85, X(-0.47), Y(-0.1) + wig);
+  ctx.quadraticCurveTo(X(-0.5), Y(-0.125) + wig, X(-0.515), Y(-0.13) + wig);
+  ctx.quadraticCurveTo(X(-0.49), Y(-0.09) + wig, X(-0.5), Y(-0.06) + wig);
+  ctx.quadraticCurveTo(X(-0.48), Y(-0.035) + wig, X(-0.485), Y(-0.01) + wig);
+  ctx.quadraticCurveTo(X(-0.46), Y(0.0) + wig, X(-0.445), Y(0.004) + wig);
+  ctx.quadraticCurveTo(X(-0.46), Y(0.025) + wig, X(-0.475), Y(0.045) + wig);
+  ctx.quadraticCurveTo(X(-0.47), Y(0.07) + wig, X(-0.49), Y(0.1) + wig);
+  ctx.quadraticCurveTo(X(-0.45), Y(0.085) + wig, X(-0.42), Y(0.05) + wig * 0.85);
+  ctx.quadraticCurveTo(X(-0.4), Y(0.03) + wig * 0.7, X(-0.37), Y(0.022) + wig * 0.6);
+  // belly back to the throat and lower jaw
+  ctx.bezierCurveTo(X(-0.26), Y(0.05), X(-0.1), Y(0.1), X(0.08), Y(0.125));
+  ctx.bezierCurveTo(X(0.24), Y(0.14), X(0.38), Y(0.1), X(0.46), Y(0.05));
+  ctx.quadraticCurveTo(X(0.5), Y(0.025), X(0.5), Y(0.004));
+  ctx.closePath();
+}
+function whaleFlipper(L, flap, near) {
+  const X = v => v * L, Y = v => v * L, f = flap * L;
+  ctx.beginPath();
+  ctx.moveTo(X(0.22), Y(0.09));
+  ctx.bezierCurveTo(X(0.2), Y(0.16), X(0.12), Y(0.25) + f, X(0.0), Y(0.33) + f * 1.6);   // leading edge
+  ctx.quadraticCurveTo(X(-0.035), Y(0.355) + f * 1.8, X(-0.03), Y(0.325) + f * 1.6);   // rounded tip
+  // knobbly trailing edge
+  ctx.quadraticCurveTo(X(0.0), Y(0.29) + f * 1.3, X(0.03), Y(0.27) + f * 1.2);
+  ctx.quadraticCurveTo(X(0.045), Y(0.25) + f, X(0.07), Y(0.225) + f * 0.9);
+  ctx.quadraticCurveTo(X(0.09), Y(0.2) + f * 0.8, X(0.11), Y(0.17) + f * 0.6);
+  ctx.bezierCurveTo(X(0.13), Y(0.14), X(0.15), Y(0.11), X(0.14), Y(0.1));
+  ctx.closePath();
+  ctx.fill();
+  if (near) {   // pale leading edge, like the references
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = theme.whale.edge;
+    ctx.beginPath();
+    ctx.moveTo(X(0.22), Y(0.09));
+    ctx.bezierCurveTo(X(0.2), Y(0.16), X(0.12), Y(0.25) + f, X(0.0), Y(0.33) + f * 1.6);
+    ctx.lineTo(X(-0.04), Y(0.36) + f * 1.8);
+    ctx.bezierCurveTo(X(0.08), Y(0.27) + f, X(0.17), Y(0.17), X(0.2), Y(0.085));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+function drawWhale(a) {
+  const L = a.len, c = theme.whale;
+  const X = v => v * L, Y = v => v * L;
+  const wig = Math.sin(a.phase) * L * 0.022;
+  const flap = Math.sin(a.phase * 0.7) * 0.012;
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  ctx.rotate(a.heading);
+  if (a.dir < 0) ctx.scale(1, -1);   // facing left, belly still down
+
+  // far flipper sits behind the body
+  ctx.fillStyle = c.farFin;
+  ctx.save(); ctx.translate(X(-0.03), Y(-0.01)); whaleFlipper(L * 0.92, -flap, false); ctx.restore();
+
+  whaleBody(L, wig);
+  ctx.fillStyle = c.body; ctx.fill();
+
+  // dorsal fin, two thirds of the way back
+  ctx.beginPath();
+  ctx.moveTo(X(-0.12), Y(-0.105));
+  ctx.quadraticCurveTo(X(-0.17), Y(-0.13), X(-0.205), Y(-0.125));
+  ctx.quadraticCurveTo(X(-0.19), Y(-0.105), X(-0.2), Y(-0.08));
+  ctx.closePath(); ctx.fill();
+
+  // details kept inside the body outline
+  ctx.save();
+  whaleBody(L, wig); ctx.clip();
+  // light along the back
+  ctx.fillStyle = c.sheen;
+  ctx.beginPath(); ctx.ellipse(X(0.02), Y(-0.085), X(0.3), Y(0.025), -0.04, 0, Math.PI * 2); ctx.fill();
+  // pale grooved throat
+  ctx.fillStyle = c.throat;
+  ctx.beginPath();
+  ctx.moveTo(X(0.5), Y(0.01));
+  ctx.bezierCurveTo(X(0.42), Y(0.035), X(0.32), Y(0.045), X(0.24), Y(0.06));
+  ctx.bezierCurveTo(X(0.14), Y(0.08), X(0.05), Y(0.1), X(-0.06), Y(0.11));
+  ctx.lineTo(X(-0.06), Y(0.2)); ctx.lineTo(X(0.5), Y(0.2));
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = c.groove; ctx.lineWidth = Math.max(1, L * 0.0022); ctx.lineCap = 'round';
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    ctx.beginPath();
+    ctx.moveTo(X(0.47 - t * 0.05), Y(0.03 + t * 0.03));
+    ctx.quadraticCurveTo(X(0.25), Y(0.075 + t * 0.045), X(0.02 + t * 0.03), Y(0.11 + t * 0.02));
+    ctx.stroke();
+  }
+  // mottled pale edge along the belly
+  ctx.fillStyle = c.throat;
+  for (let i = 0; i < 9; i++) {
+    const x = -0.04 - i * 0.032;
+    ctx.beginPath(); ctx.ellipse(X(x), Y(0.104 - i * 0.0088), X(0.008), Y(0.0032), 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  // mouth line separating jaw and throat
+  ctx.strokeStyle = c.dark; ctx.lineWidth = Math.max(1.2, L * 0.003); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(X(0.5), Y(0.008)); ctx.bezierCurveTo(X(0.42), Y(0.03), X(0.33), Y(0.04), X(0.25), Y(0.045)); ctx.stroke();
+  // knobs (tubercles) on the head
+  ctx.fillStyle = c.dark;
+  const knobs = [[0.47, -0.022], [0.44, -0.04], [0.41, -0.055], [0.38, -0.068], [0.35, -0.08], [0.32, -0.09], [0.45, 0.0], [0.42, -0.015], [0.39, -0.03]];
+  for (const [kx, ky] of knobs) { ctx.beginPath(); ctx.arc(X(kx), Y(ky), Math.max(1, L * 0.0034), 0, Math.PI * 2); ctx.fill(); }
+  // eye
+  ctx.beginPath(); ctx.ellipse(X(0.28), Y(0.025), Math.max(2, L * 0.007), Math.max(1.5, L * 0.005), 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = c.throat;
+  ctx.beginPath(); ctx.arc(X(0.282), Y(0.023), Math.max(0.6, L * 0.0018), 0, Math.PI * 2); ctx.fill();
+
+  // near flipper, long and dark with a pale edge
+  ctx.fillStyle = c.nearFin;
+  whaleFlipper(L, flap, true);
+  ctx.restore();
+}
+
+/* ------------------------------------------------------------
+   Shark: a great white, following the shark references.
+   Conical snout, tall triangular dorsal, crescent tail with a
+   longer upper lobe, long swept pectorals, white belly.
+------------------------------------------------------------ */
+function sharkBody(L, wig) {
+  const X = v => v * L, Y = v => v * L;
+  ctx.beginPath();
+  ctx.moveTo(X(0.5), Y(0.012));
+  ctx.bezierCurveTo(X(0.48), Y(-0.025), X(0.42), Y(-0.06), X(0.3), Y(-0.085));
+  ctx.bezierCurveTo(X(0.15), Y(-0.105), X(-0.05), Y(-0.1), X(-0.2), Y(-0.065));
+  ctx.bezierCurveTo(X(-0.28), Y(-0.045), X(-0.33), Y(-0.025) + wig * 0.4, X(-0.37), Y(-0.016) + wig * 0.6);
+  // upper tail lobe: long, crescent shaped
+  ctx.quadraticCurveTo(X(-0.43), Y(-0.06) + wig * 0.85, X(-0.53), Y(-0.2) + wig);
+  ctx.quadraticCurveTo(X(-0.47), Y(-0.08) + wig, X(-0.445), Y(0.0) + wig);
+  // lower tail lobe: shorter
+  ctx.quadraticCurveTo(X(-0.46), Y(0.06) + wig, X(-0.49), Y(0.13) + wig);
+  ctx.quadraticCurveTo(X(-0.42), Y(0.06) + wig * 0.85, X(-0.37), Y(0.016) + wig * 0.6);
+  ctx.bezierCurveTo(X(-0.3), Y(0.04), X(-0.15), Y(0.075), X(0.02), Y(0.085));
+  ctx.bezierCurveTo(X(0.2), Y(0.095), X(0.36), Y(0.075), X(0.44), Y(0.05));
+  ctx.quadraticCurveTo(X(0.49), Y(0.035), X(0.5), Y(0.012));
+  ctx.closePath();
+}
+function sharkFins(L, flap) {
+  const X = v => v * L, Y = v => v * L, f = flap * L;
+  ctx.beginPath();
+  // first dorsal: straight leading edge, concave trailing edge
+  ctx.moveTo(X(0.15), Y(-0.06));
+  ctx.lineTo(X(0.13), Y(-0.1));
+  ctx.quadraticCurveTo(X(0.07), Y(-0.17), X(0.01), Y(-0.245));
+  ctx.quadraticCurveTo(X(0.0), Y(-0.15), X(-0.045), Y(-0.095));
+  ctx.lineTo(X(-0.06), Y(-0.06));
+  ctx.closePath();
+  // second dorsal
+  ctx.moveTo(X(-0.24), Y(-0.035)); ctx.lineTo(X(-0.25), Y(-0.06)); ctx.lineTo(X(-0.285), Y(-0.08)); ctx.lineTo(X(-0.29), Y(-0.03)); ctx.closePath();
+  // pectoral: long, swept back
+  ctx.moveTo(X(0.21), Y(0.075));
+  ctx.quadraticCurveTo(X(0.13), Y(0.15) + f, X(0.04), Y(0.245) + f * 1.5);
+  ctx.quadraticCurveTo(X(0.09), Y(0.14) + f, X(0.12), Y(0.085));
+  ctx.closePath();
+  // pelvic and anal
+  ctx.moveTo(X(-0.1), Y(0.075)); ctx.lineTo(X(-0.16), Y(0.115)); ctx.lineTo(X(-0.15), Y(0.07)); ctx.closePath();
+  ctx.moveTo(X(-0.25), Y(0.045)); ctx.lineTo(X(-0.29), Y(0.07)); ctx.lineTo(X(-0.29), Y(0.035)); ctx.closePath();
+}
+function drawShark(a) {
+  const L = a.len, c = theme.shark;
+  const X = v => v * L, Y = v => v * L;
+  const wig = Math.sin(a.phase) * L * 0.03;
+  const flap = Math.sin(a.phase * 0.4) * 0.01;
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  ctx.rotate(a.heading);
+  if (a.dir < 0) ctx.scale(1, -1);   // facing left, belly still down
+
+  ctx.fillStyle = c.fin;
+  sharkFins(L, flap); ctx.fill();
+  sharkBody(L, wig);
+  ctx.fillStyle = c.top; ctx.fill();
+
+  // white belly with the ragged edge of a great white
+  ctx.save();
+  sharkBody(L, wig); ctx.clip();
+  ctx.fillStyle = c.belly;
+  ctx.beginPath();
+  ctx.moveTo(X(0.5), Y(0.02));
+  ctx.lineTo(X(0.42), Y(0.018));
+  ctx.quadraticCurveTo(X(0.34), Y(0.022), X(0.3), Y(0.035));
+  ctx.quadraticCurveTo(X(0.24), Y(0.04), X(0.2), Y(0.03));
+  ctx.quadraticCurveTo(X(0.12), Y(0.045), X(0.06), Y(0.04));
+  ctx.quadraticCurveTo(X(0.0), Y(0.055), X(-0.06), Y(0.045));
+  ctx.quadraticCurveTo(X(-0.14), Y(0.05), X(-0.2), Y(0.035));
+  ctx.quadraticCurveTo(X(-0.3), Y(0.03), X(-0.38), Y(0.012));
+  ctx.lineTo(X(-0.38), Y(0.2)); ctx.lineTo(X(0.5), Y(0.2));
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // gill slits, mouth, eye
+  ctx.strokeStyle = c.detail; ctx.lineWidth = Math.max(1, L * 0.004); ctx.lineCap = 'round';
+  for (let i = 0; i < 5; i++) {
+    const gx = X(0.29 - i * 0.017);
+    ctx.beginPath(); ctx.moveTo(gx, Y(-0.03)); ctx.quadraticCurveTo(gx - X(0.008), Y(0.015), gx, Y(0.055)); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.moveTo(X(0.46), Y(0.038)); ctx.quadraticCurveTo(X(0.41), Y(0.055), X(0.36), Y(0.045)); ctx.stroke();
+  ctx.fillStyle = c.detail;
+  ctx.beginPath(); ctx.arc(X(0.41), Y(-0.025), Math.max(1.5, L * 0.008), 0, Math.PI * 2); ctx.fill();
+
+  // near pectoral in front of the body
+  ctx.fillStyle = c.fin;
+  ctx.beginPath();
+  ctx.moveTo(X(0.2), Y(0.06));
+  ctx.quadraticCurveTo(X(0.13), Y(0.14) + flap * L, X(0.03), Y(0.235) + flap * L * 1.5);
+  ctx.quadraticCurveTo(X(0.09), Y(0.13) + flap * L, X(0.11), Y(0.07));
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+/* ------------------------------------------------------------
+   Loop (fixed 60 Hz simulation step, any refresh rate)
+------------------------------------------------------------ */
+function step() {
+  T += 1 / 60;
+  buildGrid();
+  updateAgent(shark);
+  updateAgent(whale);
+  updateFish();
+  updateBubbles();
+}
+function render() {
+  drawWater(T);
+  if (whale.active) drawWhale(whale);   // she swims deeper, so the school passes over her
+  for (const f of fish) drawFish(f);
+  if (shark.active && !shark.hidden) drawShark(shark);
+  drawBubbles();
+}
+let last = performance.now(), acc = 0;
+function loop(now) {
+  acc += Math.min(100, now - last); last = now;
+  let n = 0;
+  while (acc >= 1000 / 60 && n < 3) { step(); acc -= 1000 / 60; n++; }
+  if (n === 3) acc = 0;
+  render();
+  requestAnimationFrame(loop);
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+
+/* ------------------------------------------------------------
+   Input
+------------------------------------------------------------ */
+const pointer = { x: 0, y: 0 }, grab = { x: 0, y: 0 };
+let dragged = null;
+function insideBody(a, x, y, rx, ry) {
+  const dx = x - a.x, dy = y - a.y, c = Math.cos(a.heading), s = Math.sin(a.heading);
+  const lx = dx * c + dy * s, ly = -dx * s + dy * c;
+  return (lx * lx) / (rx * rx) + (ly * ly) / (ry * ry) < 1;
+}
+function agentAt(x, y) {
+  if (shark.active && !shark.hidden && insideBody(shark, x, y, shark.len * 0.5, shark.len * 0.14)) return shark;
+  if (whale.active && insideBody(whale, x, y, whale.len * 0.5, whale.len * 0.13)) return whale;
+  return null;
+}
+canvas.addEventListener('pointerdown', e => {
+  pointer.x = e.clientX; pointer.y = e.clientY;
+  const a = agentAt(pointer.x, pointer.y);
+  if (a) {
+    a.dragging = true; a.leaving = false; dragged = a;
+    grab.x = pointer.x - a.x; grab.y = pointer.y - a.y;
+    canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing'; syncButtons();
+  } else splash(pointer.x, pointer.y);
+});
+canvas.addEventListener('pointermove', e => {
+  pointer.x = e.clientX; pointer.y = e.clientY;
+  if (!dragged) canvas.style.cursor = agentAt(pointer.x, pointer.y) ? 'grab' : 'crosshair';
+});
+const endDrag = () => { if (dragged) { dragged.dragging = false; dragged = null; canvas.style.cursor = 'crosshair'; } };
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+
+const btnShark = document.getElementById('btnShark');
+const btnMother = document.getElementById('btnMother');
+const btnStyle = document.getElementById('btnStyle');
+const btnRules = document.getElementById('btnRules');
+const btnRec = document.getElementById('btnRec');
+const rulesEl = document.getElementById('rules');
+
+function syncButtons() {
+  btnShark.setAttribute('aria-pressed', String(shark.active && !shark.leaving));
+  btnMother.setAttribute('aria-pressed', String(whale.active && !whale.leaving));
+  btnRules.setAttribute('aria-pressed', String(!rulesEl.hidden));
+}
+function toggleRules() { rulesEl.hidden = !rulesEl.hidden; syncButtons(); }
+function setTheme(key) {
+  theme = THEMES[key];
+  cacheColors();
+  document.body.dataset.theme = key;
+  btnStyle.querySelector('.label').textContent = theme.name;
+}
+function nextTheme() {
+  const i = THEME_ORDER.indexOf(document.body.dataset.theme);
+  setTheme(THEME_ORDER[(i + 1) % THEME_ORDER.length]);
+}
+
+btnShark.addEventListener('click', () => toggleAgent(shark));
+btnMother.addEventListener('click', () => toggleAgent(whale));
+btnStyle.addEventListener('click', nextTheme);
+btnRules.addEventListener('click', toggleRules);
+btnRec.addEventListener('click', record);
+
+window.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 's') toggleAgent(shark);
+  else if (k === 'm') toggleAgent(whale);
+  else if (k === 'c') nextTheme();
+  else if (k === 'r') toggleRules();
+  else if (k === 't') record();
+  else if (k === 'h') document.body.classList.toggle('clean');
+});
+
+/* ------------------------------------------------------------
+   Teaser recording: captures 10 s of the canvas (no UI) as video
+------------------------------------------------------------ */
+let recorder = null;
+function record() {
+  if (recorder) return;
+  const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const type = window.MediaRecorder && types.find(t => MediaRecorder.isTypeSupported(t));
+  if (!type) { alert('This browser can’t record the canvas. Open the page in Chrome, Edge or Safari and try again.'); return; }
+  const chunks = [];
+  recorder = new MediaRecorder(canvas.captureStream(60), { mimeType: type, videoBitsPerSecond: 10e6 });
+  recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'school-teaser.' + (type.includes('mp4') ? 'mp4' : 'webm');
+    document.body.appendChild(a); a.click(); a.remove();
+    recorder = null;
+    btnRec.classList.remove('recording');
+    btnRec.querySelector('.label').textContent = 'Record teaser';
+  };
+  recorder.start();
+  btnRec.classList.add('recording');
+  let left = 10;
+  const label = btnRec.querySelector('.label');
+  label.textContent = `Recording ${left}s`;
+  const tick = setInterval(() => {
+    left--;
+    if (left <= 0 || !recorder) { clearInterval(tick); if (recorder && recorder.state !== 'inactive') recorder.stop(); return; }
+    label.textContent = `Recording ${left}s`;
+  }, 1000);
+}
+
+/* ------------------------------------------------------------
+   Go
+------------------------------------------------------------ */
+resize();
+populate();
+setTheme('lagoon');
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
