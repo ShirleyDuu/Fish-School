@@ -123,7 +123,6 @@
   /* selected: a solid white pill, like the active tab on apple.com */
   .dock button[aria-pressed="true"] { background: #fff; color: #111; }
   body[data-theme="ink"] .dock button[aria-pressed="true"] { background: #111; color: #fff; }
-  .dock button.recording { background: #fff; color: #d70015; }
 
   .hint {
     position: fixed;
@@ -188,10 +187,9 @@
 
 <nav class="dock ui" aria-label="Controls">
   <button id="btnShark" class="glass" aria-pressed="false"><span class="label">Shark</span></button>
-  <button id="btnMother" class="glass" aria-pressed="false"><span class="label">Mother whale</span></button>
+  <button id="btnMother" class="glass" aria-pressed="false"><span class="label">Mother Whale</span></button>
   <button id="btnStyle" class="glass"><span class="label">Lagoon</span></button>
   <button id="btnRules" class="glass" aria-pressed="false"><span class="label">Rules</span></button>
-  <button id="btnRec" class="glass"><span class="label">Record teaser</span></button>
 </nav>
 
 <p class="hint glass ui">Click the water to startle the school. Drag the shark or the whale to steer them. Press H to hide the controls.</p>
@@ -1104,7 +1102,6 @@ const btnShark = document.getElementById('btnShark');
 const btnMother = document.getElementById('btnMother');
 const btnStyle = document.getElementById('btnStyle');
 const btnRules = document.getElementById('btnRules');
-const btnRec = document.getElementById('btnRec');
 const rulesEl = document.getElementById('rules');
 
 function syncButtons() {
@@ -1128,7 +1125,6 @@ btnShark.addEventListener('click', () => toggleAgent(shark));
 btnMother.addEventListener('click', () => toggleAgent(whale));
 btnStyle.addEventListener('click', nextTheme);
 btnRules.addEventListener('click', toggleRules);
-btnRec.addEventListener('click', record);
 
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1137,43 +1133,8 @@ window.addEventListener('keydown', e => {
   else if (k === 'm') toggleAgent(whale);
   else if (k === 'c') nextTheme();
   else if (k === 'r') toggleRules();
-  else if (k === 't') record();
   else if (k === 'h') document.body.classList.toggle('clean');
 });
-
-/* ------------------------------------------------------------
-   Teaser recording: captures 10 s of the canvas (no UI) as video
------------------------------------------------------------- */
-let recorder = null;
-function record() {
-  if (recorder) return;
-  const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-  const type = window.MediaRecorder && types.find(t => MediaRecorder.isTypeSupported(t));
-  if (!type) { alert('This browser can’t record the canvas. Open the page in Chrome, Edge or Safari and try again.'); return; }
-  const chunks = [];
-  recorder = new MediaRecorder(canvas.captureStream(60), { mimeType: type, videoBitsPerSecond: 10e6 });
-  recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  recorder.onstop = () => {
-    const blob = new Blob(chunks, { type });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'school-teaser.' + (type.includes('mp4') ? 'mp4' : 'webm');
-    document.body.appendChild(a); a.click(); a.remove();
-    recorder = null;
-    btnRec.classList.remove('recording');
-    btnRec.querySelector('.label').textContent = 'Record teaser';
-  };
-  recorder.start();
-  btnRec.classList.add('recording');
-  let left = 10;
-  const label = btnRec.querySelector('.label');
-  label.textContent = `Recording ${left}s`;
-  const tick = setInterval(() => {
-    left--;
-    if (left <= 0 || !recorder) { clearInterval(tick); if (recorder && recorder.state !== 'inactive') recorder.stop(); return; }
-    label.textContent = `Recording ${left}s`;
-  }, 1000);
-}
 
 /* ------------------------------------------------------------
    Go
